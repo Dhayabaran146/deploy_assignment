@@ -638,8 +638,6 @@ if menu == "Chatbot":
 
     st.info("Ask questions about the employee Excel dataset.")
 
-    st.warning("Do not hardcode your API key inside the file. Paste it here or use an environment variable.")
-
     default_api_key = os.getenv("OPENROUTER_API_KEY", "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")
     api_key = "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"
 
