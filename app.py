@@ -399,7 +399,7 @@ if menu == "Cleaned Dataset":
         st.markdown(f"**Total rows(after removing duplicates): {len(df_dup)}**")
         st.dataframe(df_dup, use_container_width=True)
 
-    with st.expander("📧📱 Email & Phone Validation (fixed rules)"):
+    with st.expander("📧📱 Email & Phone Validation"):
         work = df_dup.copy()
         work["_email_valid"] = work[email_col].apply(is_valid_email)
         work["_phone_digits"] = work[phone_col].apply(digits_only)
