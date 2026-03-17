@@ -311,7 +311,7 @@ Rules:
 """
 
     headers = {
-        "Authorization": f"Bearer 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",
+        "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json"
     }
 
@@ -441,7 +441,7 @@ if menu == "Cleaned Dataset":
     with st.expander("📅 HireDate"):
         fmt = df_after_email_phone.copy()
 
-        st.caption("Dates are force-converted to YYYY-MM-DD where possible (unparseable values stay unchanged).")
+        st.caption("Dates are converted to YYYY-MM-DD .")
 
         if hire_col in fmt.columns:
             orig = fmt[hire_col].copy()
@@ -638,9 +638,11 @@ if menu == "Chatbot":
 
     st.info("Ask questions about the employee Excel dataset.")
 
-    default_api_key = os.getenv("OPENROUTER_API_KEY", "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")
-    api_key = "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"
 
+    # default_api_key = os.getenv("OPENROUTER_API_KEY", "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")
+    # api_key = "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"
+
+    api_key = st.secrets.get("OPENROUTER_API_KEY", "")
     dataset_choice = st.radio(
         "Choose data source for chatbot:",
         ["Original Dataset", "Cleaned Dataset"],
