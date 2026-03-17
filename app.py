@@ -312,7 +312,7 @@ Rules:
 
     headers = {
         "Authorization": f"Bearer {api_key}",
-        "HTTP-Referer": "https://your-app-name.streamlit.app",  
+        "HTTP-Referer": "https://dhayaeyassignment.streamlit.app/",  
         "X-Title": "Employee Dataset Chatbot",
         "Content-Type": "application/json"
     }
