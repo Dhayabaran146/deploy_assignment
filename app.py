@@ -642,7 +642,7 @@ if menu == "Chatbot":
     # default_api_key = os.getenv("OPENROUTER_API_KEY", "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")
     # api_key = "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"
 
-    api_key = st.secrets.get("OPENROUTER_API_KEY", "")
+    api_key = st.secrets.get("OPENROUTER_API_KEY")
     dataset_choice = st.radio(
         "Choose data source for chatbot:",
         ["Original Dataset", "Cleaned Dataset"],
