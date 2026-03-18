@@ -53,91 +53,6 @@ def is_valid_phone_10(x) -> bool:
     d = digits_only(x)
     return len(d) == 10
 
-# -------------------------------------------------------
-# DATE FIX HELPERS
-# -------------------------------------------------------
-ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-
-def _strip_ordinals(s: str) -> str:
-    return re.sub(r"\b(\d{1,2})(st|nd|rd|th)\b", r"\1", s, flags=re.IGNORECASE)
-
-def _normalize_separators(s: str) -> str:
-    s = s.replace(",", " ").strip()
-    s = re.sub(r"[./]", "-", s)
-    s = re.sub(r"\s+", " ", s)
-    s = re.sub(r"\s*-\s*", "-", s)
-    return s
-
-def _excel_serial_to_ts(val):
-    try:
-        f = float(val)
-        ts = pd.Timestamp("1899-12-30") + pd.to_timedelta(int(f), unit="D")
-        if 1800 <= ts.year <= 2100:
-            return ts
-    except Exception:
-        pass
-    return None
-
-def _try_parse_dt(s: str):
-    if s is None:
-        return None
-
-    if isinstance(s, (pd.Timestamp, np.datetime64)):
-        try:
-            ts = pd.to_datetime(s, errors="coerce")
-            return ts if pd.notna(ts) else None
-        except Exception:
-            return None
-
-    if isinstance(s, (int, float)) and not pd.isna(s):
-        ts = _excel_serial_to_ts(s)
-        if ts is not None:
-            return ts
-
-    s0 = str(s).strip()
-    if s0 == "":
-        return None
-
-    if re.fullmatch(r"^\d+(\.\d+)?$", s0):
-        ts = _excel_serial_to_ts(s0)
-        if ts is not None:
-            return ts
-
-    s1 = _strip_ordinals(s0)
-    s1 = _normalize_separators(s1)
-
-    for dayfirst in (False, True):
-        try:
-            ts = pd.to_datetime(s1, errors="coerce", dayfirst=dayfirst)
-            if pd.notna(ts):
-                return ts
-        except Exception:
-            pass
-
-    candidates = [
-        "%Y-%m-%d", "%Y/%m/%d", "%d-%m-%Y", "%m-%d-%Y",
-        "%d/%m/%Y", "%m/%d/%Y", "%d-%b-%Y", "%d-%B-%Y",
-        "%b-%d-%Y", "%B-%d-%Y", "%d %b %Y", "%d %B %Y",
-        "%b %d %Y", "%B %d %Y", "%d-%m-%y", "%m-%d-%y",
-        "%d/%m/%y", "%m/%d/%y"
-    ]
-
-    for fmt in candidates:
-        try:
-            return pd.to_datetime(s1, format=fmt, errors="raise")
-        except Exception:
-            continue
-
-    return None
-
-def fix_date_format_force_series(series: pd.Series) -> pd.Series:
-    def _fix(x):
-        if pd.isna(x):
-            return x
-        ts = _try_parse_dt(x)
-        return ts.strftime("%Y-%m-%d") if ts is not None else str(x).strip()
-
-    return series.map(_fix).astype("object")
 
 # -------------------------------------------------------
 # GENDER / COUNTRY / SALARY
@@ -486,24 +401,58 @@ if menu == "Cleaned Dataset":
         df_after_email_phone = cleaned_email_phone
 
     with st.expander("📅 HireDate"):
+
+        st.caption("All dates converted to YYYY-MM-DD (invalid dates become NULL).")
+
+        def simple_fix_dates(series: pd.Series) -> pd.Series:
+            s = series.astype(str).str.strip()
+
+            # Remove ALL non-digit except / and -
+            s = s.str.replace(r"[^0-9/\-]", "", regex=True)
+
+            fixed = []
+
+            for val in s:
+                if val==None:
+                    fixed.append(pd.NA)
+                    continue
+
+                # Try direct pandas conversion (handles y/m/d, d/m/y, etc.)
+                dt = pd.to_datetime(val, errors="coerce", dayfirst=True)
+
+                # If still NaT, try without separators (e.g. 20240315)
+                if pd.isna(dt) and val.isdigit() and len(val) in [6, 7, 8]:
+                    try:
+                        # auto-detect
+                        dt = pd.to_datetime(val, format="%Y%m%d", errors="coerce")
+                    except:
+                        dt = None
+
+                if pd.isna(dt):
+                    fixed.append(pd.NA)
+                else:
+                    fixed.append(dt.strftime("%Y-%m-%d"))
+
+            return pd.Series(fixed, dtype="object")
+
+        # Apply conversion
+        orig = df_after_email_phone[hire_col]
+        fixed = simple_fix_dates(orig)
+
+        st.markdown("**Before vs After (HireDate)**")
+        c1, c2 = st.columns(2)
+
+        with c1:
+            st.markdown("Before")
+            st.dataframe(orig.to_frame(hire_col).head(15), use_container_width=True)
+
+        with c2:
+            st.markdown("After")
+            st.dataframe(fixed.to_frame(hire_col).head(15), use_container_width=True)
+
+        # Save back
         fmt = df_after_email_phone.copy()
-
-        st.caption("Dates are converted to YYYY-MM-DD .")
-
-        if hire_col in fmt.columns:
-            orig = fmt[hire_col].copy()
-            fixed = fix_date_format_force_series(orig)
-
-            st.markdown("**Before vs After (HireDate)**")
-            c1, c2 = st.columns(2)
-            with c1:
-                st.markdown("Before")
-                st.dataframe(orig.to_frame(hire_col).head(15), use_container_width=True)
-            with c2:
-                st.markdown("After")
-                st.dataframe(fixed.to_frame(hire_col).head(15), use_container_width=True)
-
-            fmt[hire_col] = fixed
+        fmt[hire_col] = fixed
 
     with st.expander("🧱 Format Fix — Gender, Country & Employment Status"):
         if gender_col in fmt.columns:
