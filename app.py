@@ -342,6 +342,51 @@ Rules:
     data = response.json()
     return data["choices"][0]["message"]["content"]
 
+def apply_filters(data: pd.DataFrame,
+                  dept_filter: list,
+                  gender_filter: list,
+                  country_filter: list,
+                  status_filter: list) -> pd.DataFrame:
+    out = data
+    if dept_filter:
+        out = out[out["Department"].isin(dept_filter)]
+    if gender_filter:
+        out = out[out["Gender"].isin(gender_filter)]
+    if country_filter:
+        out = out[out["Country"].isin(country_filter)]
+    if status_filter:
+        out = out[out["EmploymentStatus"].isin(status_filter)]
+    return out
+
+def simple_fix_dates(series: pd.Series) -> pd.Series:
+    # Convert various messy strings to YYYY-MM-DD or NA
+    s = series.astype("string").str.strip()
+    # Remove ALL non-digit except / and -
+    s = s.str.replace(r"[^0-9/\-]", "", regex=True)
+
+    fixed = []
+    for val in s:
+        if pd.isna(val) or val == "":
+            fixed.append(pd.NA)
+            continue
+
+        # Try direct pandas conversion (handles d/m/y, y-m-d, etc.)
+        dt = pd.to_datetime(val, errors="coerce", dayfirst=True)
+
+        # If still NaT, try compressed digits like 20240315
+        if pd.isna(dt) and val.isdigit() and len(val) in [6, 7, 8]:
+            # Try YYYYMMDD then DDMMYYYY fallback
+            dt = pd.to_datetime(val, format="%Y%m%d", errors="coerce")
+            if pd.isna(dt):
+                dt = pd.to_datetime(val, dayfirst=True, errors="coerce")
+
+        if pd.isna(dt):
+            fixed.append(pd.NA)
+        else:
+            fixed.append(dt.strftime("%Y-%m-%d"))
+
+    return pd.Series(fixed, dtype="object")
+
 # -------------------------------------------------------
 # SIDEBAR
 # -------------------------------------------------------
@@ -538,34 +583,70 @@ if menu == "Cleaned Dataset":
         )
 
 # -------------------------------------------------------
-# VISUALIZATION
+# VISUALIZATION (FILTERS AT TOP OF PAGE)
 # -------------------------------------------------------
 if menu == "Visualization":
     st.title("📊 Exploratory Visualizations")
 
+    # Guard: require cleaned data
     if "cleaned_df" not in st.session_state or st.session_state["cleaned_df"] is None:
-        st.warning("Please open Cleaned Dataset first to generate Visualization.")
+        st.warning("Please open **Cleaned Dataset** first to generate Visualization.")
         st.stop()
 
-    viz_df = st.session_state["cleaned_df"].copy()
+    base_df = st.session_state["cleaned_df"]
 
-    dept_col = "Department"
-    gender_col = "Gender"
-    status_col = "EmploymentStatus"
-    hire_col = "HireDate"
+    # -------------------- FILTER BAR (TOP) --------------------
+    st.subheader("🔍 Filters")
+    with st.container():
+        # Build choices from cleaned data (drop NA)
+        dept_choices = sorted([x for x in base_df["Department"].dropna().unique().tolist()])
+        gender_choices = sorted([x for x in base_df["Gender"].dropna().unique().tolist()])
+        country_choices = sorted([x for x in base_df["Country"].dropna().unique().tolist()])
+        status_choices = sorted([x for x in base_df["EmploymentStatus"].dropna().unique().tolist()])
 
+        c1, c2 = st.columns(2)
+        c3, c4 = st.columns(2)
+
+        dept_filter = c1.multiselect("Department", options=dept_choices, default=[])
+        gender_filter = c2.multiselect("Gender", options=gender_choices, default=[])
+        country_filter = c3.multiselect("Country", options=country_choices, default=[])
+        status_filter = c4.multiselect("Employment Status", options=status_choices, default=[])
+
+        # Optional: clear filters button
+        clear = st.button("Clear all filters")
+        if clear:
+            # Reset by rerunning with empty selections (Streamlit rerun handles this automatically)
+            st.experimental_rerun()
+
+    # Apply filters
+    viz_df = apply_filters(
+        base_df,
+        dept_filter=dept_filter,
+        gender_filter=gender_filter,
+        country_filter=country_filter,
+        status_filter=status_filter
+    )
+
+    # Resolve columns (from cleaned data)
+    dept_col    = "Department"
+    gender_col  = "Gender"
+    status_col  = "EmploymentStatus"
+    hire_col    = "HireDate"
+
+    # Parse HireDate safely
     hire_parsed = pd.to_datetime(viz_df[hire_col], errors="coerce") if hire_col in viz_df.columns else None
 
+    st.markdown("---")
+
+    # Pre-compute aggregates
     dept_counts = (
         viz_df[dept_col].astype("string").str.strip().str.title().value_counts()
         if dept_col in viz_df.columns else pd.Series(dtype="int")
     )
-
     g_counts = (
         viz_df[gender_col].astype("string").str.strip().str.title().value_counts()
         if gender_col in viz_df.columns else pd.Series(dtype="int")
     )
-
     s_counts = (
         viz_df[status_col].astype("string").str.strip().str.title().value_counts()
         if status_col in viz_df.columns else pd.Series(dtype="int")
@@ -579,58 +660,65 @@ if menu == "Visualization":
         if not tmp.empty:
             monthly = tmp.resample("MS").size()
 
+    # ---------------------- Row 1: Dept (Bar) | Gender (Pie) ----------------------
     col1, col2 = st.columns(2)
 
     with col1:
         st.subheader("🏢 Headcount by Department")
-        fig, ax = plt.subplots(figsize=(7, 4))
-        ax.bar(dept_counts.index, dept_counts.values)
-        ax.set_xlabel("Department")
-        ax.set_ylabel("Employees")
-        ax.set_title("Headcount by Department")
-        plt.xticks(rotation=45, ha="right")
-        st.pyplot(fig)
+        if dept_counts.empty:
+            st.info("No data to display for Department with current filters.")
+        else:
+            fig, ax = plt.subplots(figsize=(7, 4))
+            ax.bar(dept_counts.index, dept_counts.values, color="#4e79a7")
+            ax.set_xlabel("Department")
+            ax.set_ylabel("Employees")
+            ax.set_title("Headcount by Department")
+            plt.xticks(rotation=45, ha="right")
+            st.pyplot(fig)
 
     with col2:
         st.subheader("👤 Gender Distribution")
-        fig, ax = plt.subplots(figsize=(6, 6))
-        if len(g_counts) > 0:
+        if g_counts.empty:
+            st.info("No data to display for Gender with current filters.")
+        else:
+            fig, ax = plt.subplots(figsize=(6, 6))
             ax.pie(
                 g_counts.values,
                 labels=g_counts.index,
                 autopct="%1.1f%%",
-                startangle=90
+                startangle=90,
+                colors=["#4e79a7", "#e15759", "#76b7b2", "#b07aa1"]
             )
             ax.axis("equal")
-        else:
-            ax.text(0.5, 0.5, "No gender data available", ha="center", va="center")
-            ax.axis("off")
-        st.pyplot(fig)
+            st.pyplot(fig)
 
+    # ---------------------- Row 2: Status (Bar) | Hiring Trend (Line) ----------------------
     col3, col4 = st.columns(2)
 
     with col3:
         st.subheader("💼 Employment Status Count")
-        fig, ax = plt.subplots(figsize=(7, 4))
-        ax.barh(s_counts.index, s_counts.values)
-        ax.set_xlabel("Employees")
-        ax.set_ylabel("Employment Status")
-        ax.set_title("Employees by Status")
-        st.pyplot(fig)
+        if s_counts.empty:
+            st.info("No data to display for Employment Status with current filters.")
+        else:
+            fig, ax = plt.subplots(figsize=(7, 4))
+            ax.barh(s_counts.index, s_counts.values, color="#59a14f")
+            ax.set_xlabel("Employees")
+            ax.set_ylabel("Employment Status")
+            ax.set_title("Employees by Status")
+            st.pyplot(fig)
 
     with col4:
         st.subheader("📈 Hiring Trend Over Time")
-        fig, ax = plt.subplots(figsize=(9, 4))
-        if monthly is not None and not monthly.empty:
-            ax.plot(monthly.index, monthly.values, marker="o", linewidth=2)
+        if monthly is None or monthly.empty:
+            st.info("No valid HireDate data to plot with current filters.")
+        else:
+            fig, ax = plt.subplots(figsize=(9, 4))
+            ax.plot(monthly.index, monthly.values, marker="o", linewidth=2, color="#f28e2b")
             ax.set_xlabel("Year")
             ax.set_ylabel("New Hires")
             ax.set_title("Hiring Trend")
             ax.grid(True, linestyle="--", alpha=0.4)
-        else:
-            ax.text(0.5, 0.5, "No valid hire date data available", ha="center", va="center")
-            ax.axis("off")
-        st.pyplot(fig)
+            st.pyplot(fig)
 
 # -------------------------------------------------------
 # CHATBOT
