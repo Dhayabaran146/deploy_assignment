@@ -581,6 +581,12 @@ if menu == "Visualization":
     gender_col  = "Gender"
     status_col  = "EmploymentStatus"
     hire_col    = "HireDate"
+    email_col = "Email"
+    phone_col = "Phone"
+    gender_col = "Gender"
+    country_col = "Country"
+    status_col = "EmploymentStatus"
+    salary_col = "Salary"
 
     # Parse HireDate safely
     hire_parsed = pd.to_datetime(viz_df[hire_col], errors="coerce") if hire_col in viz_df.columns else None
