@@ -233,7 +233,7 @@ Rules:
     }
 
     payload = {
-        "model": "gemini-3.1-pro-preview",
+        "model": "arcee-ai/trinity-mini:free",
         "messages": [
             {
                 "role": "system",
