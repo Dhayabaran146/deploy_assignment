@@ -233,7 +233,7 @@ Rules:
     }
 
     payload = {
-        "model": "openai/gpt-4o-mini",
+        "model": "gemini-3.1-pro-preview",
         "messages": [
             {
                 "role": "system",
