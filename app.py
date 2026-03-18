@@ -80,12 +80,12 @@ def normalize_country(series: pd.Series) -> pd.Series:
         s = str(c).strip().lower().replace(".", "")
         if s in {"us", "usa", "united states", "unitedstates"}:
             return "USA"
-        if s in {"uk", "united kingdom", "unitedkingdom", "united kindgom"}:
+        if s in {"uk", "united kingdom", "unitedkingdom", "united kindgom","Uk"}:
             return "UK"
         if s in {"uae", "united arab emirates"}:
             return "UAE"
-        if s in {"in", "india", "bharat"}:
-            return "India"
+        if s in {"in", "india", "bharat","India"}:
+            return "IN"
         if s in {"eu", "european union"}:
             return "EU"
         cleaned = re.sub(r"\s+", " ", re.sub(r"[^a-z\s-]", "", s)).strip()
