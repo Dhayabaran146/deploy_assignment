@@ -22,11 +22,7 @@ st.set_page_config(
 # -------------------------------------------------------
 FILE_NAME = "dirty_employee_dataset_150_rows.xlsx"
 
-try:
-    df = pd.read_excel(FILE_NAME)
-except Exception as e:
-    st.error(f"Failed to load '{FILE_NAME}'. Error: {e}")
-    st.stop()
+pd.read_excel(FILE_NAME)
 
 # -------------------------------------------------------
 # EMAIL FUNCTIONS
