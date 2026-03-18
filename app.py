@@ -22,7 +22,7 @@ st.set_page_config(
 # -------------------------------------------------------
 FILE_NAME = "dirty_employee_dataset_150_rows.xlsx"
 
-pd.read_excel(FILE_NAME)
+df=pd.read_excel(FILE_NAME)
 
 # -------------------------------------------------------
 # EMAIL FUNCTIONS
