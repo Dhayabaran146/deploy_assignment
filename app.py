@@ -668,6 +668,18 @@ if menu == "Visualization":
             ax.set_title("Hiring Trend")
             ax.grid(True, linestyle="--", alpha=0.4)
             st.pyplot(fig)
+            
+    st.caption("Boxplot by Department (Top N by headcount)")
+    topN = st.slider("Show top N departments", 3, 15, 8, key="dept_topn_salary")
+    dept_order = viz_df[dept_col].value_counts().head(topN).index.tolist()
+    plot_df = viz_df[viz_df[dept_col].isin(dept_order)][[dept_col, salary_col]].dropna()
+    fig, ax = plt.subplots(figsize=(10, 4))
+    data = [plot_df[plot_df[dept_col] == d][salary_col].values for d in dept_order]
+    ax.boxplot(data, labels=[d.title() for d in dept_order], vert=True, patch_artist=True,boxprops=dict(facecolor="#76b7b2", color="#2c3e50"),medianprops=dict(color="#d62728", linewidth=2))
+    ax.set_ylabel("Salary")
+    ax.set_title("Salary by Department (Boxplot)")
+    plt.xticks(rotation=30, ha="right")
+    st.pyplot(fig)
 
 # -------------------------------------------------------
 # CHATBOT
