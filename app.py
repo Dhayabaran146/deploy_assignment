@@ -557,11 +557,6 @@ if menu == "Visualization":
         country_filter = c3.multiselect("Country", options=country_choices, default=[])
         status_filter = c4.multiselect("Employment Status", options=status_choices, default=[])
 
-        # Optional: clear filters button
-        clear = st.button("Clear all filters")
-        if clear:
-            # Reset by rerunning with empty selections (Streamlit rerun handles this automatically)
-            st.experimental_rerun()
 
     # Apply filters
     viz_df = apply_filters(
