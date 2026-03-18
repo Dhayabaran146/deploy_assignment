@@ -713,14 +713,6 @@ if menu == "Chatbot":
 
     st.write(f"Rows available for chatbot: {len(chat_df)}")
 
-    st.markdown("**Example questions**")
-    st.write(
-        "How many employees are there? | "
-        "What is the average salary? | "
-        "List departments | "
-        "How many invalid emails are there? | "
-        "Show employees from India"
-    )
 
     if "chat_history" not in st.session_state:
         st.session_state["chat_history"] = []
